@@ -64,12 +64,24 @@ public sealed class SearchComposer : IComposer
     public void Compose(IUmbracoBuilder builder)
     {
         builder.AddSearchCore();
-        builder.AddUmbracoAzureAISearch(builder.Config);
+        builder.AddUmbracoAzureAISearch(builder.Config)
+               .RebuildAzureAISearchOnStartup(); // optional: full re-index on every startup
     }
 }
 ```
 
-That's it. On startup, the index is created automatically. Content is indexed on publish.
+That's it. On startup, the index is created automatically. Content is indexed incrementally on save & publish.
+
+### Initial Index Population
+
+By default, only new content published **after** the package is installed gets indexed. To populate the index with all existing content, chain `.RebuildAzureAISearchOnStartup()`:
+
+```csharp
+builder.AddUmbracoAzureAISearch(builder.Config)
+       .RebuildAzureAISearchOnStartup();
+```
+
+This triggers a full rebuild via `IContentIndexingService` on every application start. Once your index is populated, you can remove this call to avoid unnecessary rebuilds — incremental indexing on save/publish will keep the index up to date.
 
 ---
 
