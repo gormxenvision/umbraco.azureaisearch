@@ -8,9 +8,11 @@ using Umbraco.AzureAISearch.Services.Indexer;
 using Umbraco.AzureAISearch.Services.IndexManager;
 using Umbraco.AzureAISearch.Services.Searcher;
 using Umbraco.Cms.Core.DependencyInjection;
+using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Notifications;
+using Umbraco.Cms.Search.Core.Configuration;
 using Umbraco.Cms.Search.Core.Notifications;
-using Umbraco.Cms.Search.Core.Services;
+using Umbraco.Cms.Search.Core.Services.ContentIndexing;
 
 namespace Umbraco.AzureAISearch.Extensions;
 
@@ -26,10 +28,20 @@ public static class ServiceCollectionExtensions
         builder.Services.AddSingleton<IIndexAliasResolver, IndexAliasResolver>();
         builder.Services.AddSingleton<IAzureAISearchIndexManager, AzureAISearchIndexManager>();
         builder.Services.AddSingleton<DocumentMapper>();
-        builder.Services.AddSingleton<IAzureAISearchIndexer, AzureAISearchIndexer>();
-        builder.Services.AddSingleton<IIndexer, AzureAISearchIndexer>();
-        builder.Services.AddTransient<IAzureAISearchSearcher, AzureAISearchSearcher>();
-        builder.Services.AddTransient<ISearcher, AzureAISearchSearcher>();
+
+        // Register concrete types so the IndexerResolver can resolve them
+        builder.Services.AddSingleton<AzureAISearchIndexer>();
+        builder.Services.AddSingleton<IAzureAISearchIndexer>(sp => sp.GetRequiredService<AzureAISearchIndexer>());
+        builder.Services.AddTransient<AzureAISearchSearcher>();
+        builder.Services.AddTransient<IAzureAISearchSearcher>(sp => sp.GetRequiredService<AzureAISearchSearcher>());
+
+        // Register with IndexOptions so the IIndexerResolver/ISearcherResolver can find our implementations
+        builder.Services.Configure<IndexOptions>(options =>
+        {
+            options.RegisterContentIndex<AzureAISearchIndexer, AzureAISearchSearcher, IPublishedContentChangeStrategy>(
+                Umbraco.Cms.Search.Core.Constants.IndexAliases.PublishedContent,
+                UmbracoObjectTypes.Document);
+        });
 
         builder.AddNotificationHandler<UmbracoApplicationStartingNotification, EnsureIndexNotificationHandler>();
         builder.AddNotificationAsyncHandler<IndexRebuildStartingNotification, RebuildIndexNotificationHandler>();
