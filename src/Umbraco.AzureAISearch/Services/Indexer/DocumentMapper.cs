@@ -4,17 +4,29 @@ using Umbraco.AzureAISearch.Constants;
 using Umbraco.AzureAISearch.Extensions;
 using Umbraco.AzureAISearch.Models;
 using Umbraco.Cms.Core.Models;
+using Umbraco.Cms.Core.Models.PublishedContent;
+using Umbraco.Cms.Core.Routing;
+using Umbraco.Cms.Core.Web;
 using Umbraco.Cms.Search.Core.Models.Indexing;
 
 namespace Umbraco.AzureAISearch.Services.Indexer;
 
 internal sealed class DocumentMapper
 {
-    private readonly string _baseUrl;
+    private readonly string? _baseUrl;
+    private readonly IUmbracoContextFactory _umbracoContextFactory;
+    private readonly IPublishedUrlProvider _publishedUrlProvider;
 
-    public DocumentMapper(IOptions<AzureAISearchOptions> options)
+    public DocumentMapper(
+        IOptions<AzureAISearchOptions> options,
+        IUmbracoContextFactory umbracoContextFactory,
+        IPublishedUrlProvider publishedUrlProvider)
     {
-        _baseUrl = options.Value.BaseUrl.TrimEnd('/');
+        _baseUrl = string.IsNullOrWhiteSpace(options.Value.BaseUrl)
+            ? null
+            : options.Value.BaseUrl.TrimEnd('/');
+        _umbracoContextFactory = umbracoContextFactory;
+        _publishedUrlProvider = publishedUrlProvider;
     }
 
     public List<SearchDocument> MapToDocuments(
@@ -26,6 +38,9 @@ internal sealed class DocumentMapper
     {
         var fieldsByFieldName = fields.GroupBy(f => f.FieldName).ToList();
         var documents = new List<SearchDocument>();
+
+        // Resolve the absolute URL from Umbraco's published content routing
+        var resolvedUrls = ResolveContentUrls(contentKey);
 
         foreach (var variation in variations)
         {
@@ -89,7 +104,10 @@ internal sealed class DocumentMapper
             // If no title from R1, try the first text
             title ??= allTexts.FirstOrDefault() ?? string.Empty;
 
-            var url = BuildUrl(route);
+            // Resolve URL: prefer Umbraco routing, then field-extracted route, then fallback BaseUrl
+            var url = (variation.Culture is not null && resolvedUrls.TryGetValue(variation.Culture, out var cultUrl) ? cultUrl : null)
+                      ?? (resolvedUrls.TryGetValue(string.Empty, out var invUrl) ? invUrl : null)
+                      ?? BuildUrl(route);
             var content = string.Join(" ", allTexts);
 
             // Access keys
@@ -121,11 +139,49 @@ internal sealed class DocumentMapper
 
     private string BuildUrl(string? route)
     {
+        if (_baseUrl is null)
+            return route ?? string.Empty;
+
         if (string.IsNullOrWhiteSpace(route))
             return _baseUrl;
 
         var path = route.StartsWith('/') ? route : $"/{route}";
         return $"{_baseUrl}{path}";
+    }
+
+    private Dictionary<string, string> ResolveContentUrls(Guid contentKey)
+    {
+        var urls = new Dictionary<string, string>();
+
+        try
+        {
+            using var ctx = _umbracoContextFactory.EnsureUmbracoContext();
+            var content = ctx.UmbracoContext.Content?.GetById(contentKey);
+            if (content is null) return urls;
+
+            // Get URL for each culture the content is published in
+            foreach (var culture in content.Cultures.Keys)
+            {
+                var url = _publishedUrlProvider.GetUrl(content, UrlMode.Absolute, culture);
+                if (!string.IsNullOrWhiteSpace(url) && url != "#")
+                {
+                    urls[culture] = url;
+                }
+            }
+
+            // Also try invariant (stored with empty string key)
+            var invariantUrl = _publishedUrlProvider.GetUrl(content, UrlMode.Absolute);
+            if (!string.IsNullOrWhiteSpace(invariantUrl) && invariantUrl != "#")
+            {
+                urls[string.Empty] = invariantUrl;
+            }
+        }
+        catch
+        {
+            // Fallback to BuildUrl if Umbraco context is unavailable (e.g. during rebuild)
+        }
+
+        return urls;
     }
 
     private static IndexField[] GetVariationFields(

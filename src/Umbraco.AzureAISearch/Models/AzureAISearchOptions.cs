@@ -15,9 +15,10 @@ public class AzureAISearchOptions
     public required string Key { get; set; }
 
     /// <summary>
-    /// The base URL for building absolute content URLs (e.g., "https://www.example.com").
+    /// Optional base URL for building absolute content URLs (e.g., "https://www.example.com").
+    /// If not set, URLs are resolved automatically from Umbraco's domain configuration.
     /// </summary>
-    public required string BaseUrl { get; set; }
+    public string? BaseUrl { get; set; }
 
     /// <summary>
     /// Content type aliases to exclude from indexing.

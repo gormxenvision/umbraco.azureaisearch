@@ -35,7 +35,6 @@ Add to `appsettings.json`:
   "AzureAISearch": {
     "Endpoint": "https://your-service.search.windows.net",
     "Key": "your-admin-api-key",
-    "BaseUrl": "https://www.yoursite.com",
     "ExcludedContentTypes": [],
     "Environment": null
   }
@@ -46,7 +45,7 @@ Add to `appsettings.json`:
 |---------|-------------|
 | `Endpoint` | Your Azure AI Search service URL |
 | `Key` | Admin API key |
-| `BaseUrl` | Domain used to build absolute URLs for indexed content |
+| `BaseUrl` | *(Optional)* Fallback domain for URLs. If omitted, URLs are resolved automatically from Umbraco's domain configuration |
 | `ExcludedContentTypes` | Array of content type aliases to skip during indexing |
 | `Environment` | Optional prefix for index names (e.g. `"dev"` → `dev-publishedcontent`) |
 

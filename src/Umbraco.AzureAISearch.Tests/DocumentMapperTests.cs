@@ -1,7 +1,10 @@
 using Microsoft.Extensions.Options;
+using Moq;
 using Umbraco.AzureAISearch.Models;
 using Umbraco.AzureAISearch.Services.Indexer;
 using Umbraco.Cms.Core.Models;
+using Umbraco.Cms.Core.Routing;
+using Umbraco.Cms.Core.Web;
 using Umbraco.Cms.Search.Core.Models.Indexing;
 using Xunit;
 
@@ -9,7 +12,7 @@ namespace Umbraco.AzureAISearch.Tests;
 
 public class DocumentMapperTests
 {
-    private DocumentMapper CreateMapper(string baseUrl = "https://www.example.com")
+    private DocumentMapper CreateMapper(string? baseUrl = "https://www.example.com")
     {
         var options = Options.Create(new AzureAISearchOptions
         {
@@ -17,7 +20,9 @@ public class DocumentMapperTests
             Key = "test-key",
             BaseUrl = baseUrl,
         });
-        return new DocumentMapper(options);
+        var contextFactory = new Mock<IUmbracoContextFactory>();
+        var urlProvider = new Mock<IPublishedUrlProvider>();
+        return new DocumentMapper(options, contextFactory.Object, urlProvider.Object);
     }
 
     [Fact]
