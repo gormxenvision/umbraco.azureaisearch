@@ -36,4 +36,14 @@ public static class ServiceCollectionExtensions
 
         return builder;
     }
+
+    /// <summary>
+    /// Triggers a full index rebuild on application startup.
+    /// Call this after <see cref="AddUmbracoAzureAISearch"/> to populate the index on first run.
+    /// </summary>
+    public static IUmbracoBuilder RebuildAzureAISearchOnStartup(this IUmbracoBuilder builder)
+    {
+        builder.AddNotificationHandler<UmbracoApplicationStartedNotification, RebuildIndicesOnStartupNotificationHandler>();
+        return builder;
+    }
 }
