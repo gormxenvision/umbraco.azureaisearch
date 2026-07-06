@@ -136,6 +136,20 @@ On multi-server deployments, only the **primary** node manages the index. Subscr
 
 ---
 
+## Releasing a New Version
+
+1. Ensure all changes are committed and pushed to `main`
+2. Tag the release with the version number:
+   ```powershell
+   git tag v1.2.0
+   git push --tags
+   ```
+3. The GitHub Actions workflow automatically builds, tests, and publishes to NuGet.org via [Trusted Publishing](https://learn.microsoft.com/en-gb/nuget/nuget-org/trusted-publishing) (no API key required)
+
+The version in the tag (e.g. `v1.2.0`) is used as the package version — no need to update `.csproj` manually.
+
+---
+
 ## License
 
 MIT
