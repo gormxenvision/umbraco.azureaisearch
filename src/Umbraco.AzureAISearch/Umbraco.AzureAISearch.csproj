@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Umbraco.AzureAISearch</PackageId>
+    <Version>1.0.0</Version>
+    <Title>Azure AI Search Provider for Umbraco Search</Title>
+    <Description>An Azure AI Search provider for Umbraco.Cms.Search with Microsoft Foundry-compatible index schema (content, url, title fields) and relevance-tiered scoring for direct search.</Description>
+    <Authors>Edmond Etemi</Authors>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>umbraco;azure;ai;search;foundry</PackageTags>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Umbraco.AzureAISearch.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.Search.Documents" Version="11.7.0" />
+    <PackageReference Include="Umbraco.Cms.Search.Core" Version="[1.0.0,)" />
+    <PackageReference Include="Umbraco.Cms.Web.Website" Version="[17.0.0,18.0.0)" />
+    <PackageReference Include="Umbraco.Cms.Web.Common" Version="[17.0.0,18.0.0)" />
+  </ItemGroup>
+
+</Project>
