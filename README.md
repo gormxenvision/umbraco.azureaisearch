@@ -23,7 +23,7 @@ At the same time, it maintains relevance tiers and a scoring profile for high-qu
 
 ```bash
 dotnet add package Umbraco.Cms.Search.Core
-dotnet add package Umbraco.AzureAISearch
+dotnet add package GXE.Umbraco.AzureAISearch
 ```
 
 ### 2. Configure
