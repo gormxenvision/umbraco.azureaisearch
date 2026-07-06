@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Options;
+﻿using Microsoft.Extensions.Options;
 using Moq;
 using Umbraco.AzureAISearch.Models;
 using Umbraco.AzureAISearch.Services.Indexer;
@@ -42,7 +42,7 @@ public class DocumentMapperTests
 
         var docs = mapper.MapToDocuments(Guid.NewGuid(), UmbracoObjectTypes.Document, variations, fields, null);
 
-        Assert.Equal(2, docs.Count);
+        Assert.Equal(2, docs.Documents.Count);
     }
 
     [Fact]
@@ -57,7 +57,7 @@ public class DocumentMapperTests
 
         var docs = mapper.MapToDocuments(Guid.NewGuid(), UmbracoObjectTypes.Document, variations, fields, null);
 
-        Assert.Equal("https://www.example.com/about-us", docs[0]["url"]?.ToString());
+        Assert.Equal("https://www.example.com/about-us", docs.Documents[0]["url"]?.ToString());
     }
 
     [Fact]
@@ -72,7 +72,7 @@ public class DocumentMapperTests
 
         var docs = mapper.MapToDocuments(Guid.NewGuid(), UmbracoObjectTypes.Document, variations, fields, null);
 
-        var content = docs[0]["content"]?.ToString();
+        var content = docs.Documents[0]["content"]?.ToString();
         Assert.NotNull(content);
         Assert.DoesNotContain("<", content);
         Assert.Contains("Hello World", content);
@@ -92,9 +92,9 @@ public class DocumentMapperTests
 
         var docs = mapper.MapToDocuments(Guid.NewGuid(), UmbracoObjectTypes.Document, variations, fields, null);
 
-        var r1 = docs[0]["contentR1"] as string[];
-        var r2 = docs[0]["contentR2"] as string[];
-        var r3 = docs[0]["contentR3"] as string[];
+        var r1 = docs.Documents[0]["contentR1"] as string[];
+        var r2 = docs.Documents[0]["contentR2"] as string[];
+        var r3 = docs.Documents[0]["contentR3"] as string[];
 
         Assert.Contains("Title Text", r1!);
         Assert.Contains("Subtitle Text", r2!);
@@ -114,8 +114,9 @@ public class DocumentMapperTests
 
         var docs = mapper.MapToDocuments(Guid.NewGuid(), UmbracoObjectTypes.Document, variations, fields, null);
 
-        var content = docs[0]["content"]?.ToString();
+        var content = docs.Documents[0]["content"]?.ToString();
         Assert.Contains("Title", content);
         Assert.Contains("Body", content);
     }
 }
+

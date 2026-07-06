@@ -24,10 +24,38 @@ internal static class IndexConstants
         public const string ContentR2 = "contentR2";
         public const string ContentR3 = "contentR3";
         public const string Url = "url";
+        public const string PathIds = "pathIds";
+    }
+
+    public static class FieldTypePostfix
+    {
+        public const string Texts = "_texts";
+        public const string TextsR1 = "_texts_r1";
+        public const string TextsR2 = "_texts_r2";
+        public const string TextsR3 = "_texts_r3";
+        public const string Keywords = "_keywords";
+        public const string Integers = "_integers";
+        public const string Decimals = "_decimals";
+        public const string DateTimeOffsets = "_datetimeoffsets";
+        public const string Sortable = "_sort";
     }
 
     public static class ScoringProfiles
     {
         public const string RelevanceBoost = "relevanceBoost";
     }
+
+    /// <summary>
+    /// System fields whose keyword values should NOT be included in the Foundry 'content' aggregate.
+    /// </summary>
+    public static readonly HashSet<string> SystemKeywordFields = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "contentTypeAlias",
+        "templateAlias",
+        "pathIds",
+        "__NodeId",
+        "__Path",
+        "__NodeType",
+        "__Published",
+    };
 }

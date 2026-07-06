@@ -1,4 +1,4 @@
-using Azure.Search.Documents;
+﻿using Azure.Search.Documents;
 using Azure.Search.Documents.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -43,13 +43,15 @@ internal sealed class AzureAISearchIndexer(
         var indexName = aliasResolver.Resolve(indexAlias);
         var searchClient = clientFactory.GetSearchClient(indexName);
 
-        var documents = documentMapper.MapToDocuments(id, objectType, variations, fieldsList, protection);
+        var mappingResult = documentMapper.MapToDocuments(id, objectType, variations, fieldsList, protection);
 
-        if (documents.Count == 0) return;
+        if (mappingResult.Documents.Count == 0) return;
+
+        await indexManager.EnsureFieldsExistAsync(indexAlias, mappingResult.FieldMappings);
 
         try
         {
-            var batch = IndexDocumentsBatch.MergeOrUpload(documents);
+            var batch = IndexDocumentsBatch.MergeOrUpload(mappingResult.Documents);
             var result = await searchClient.IndexDocumentsAsync(batch,
                 new IndexDocumentsOptions { ThrowOnAnyError = false });
 
@@ -66,7 +68,7 @@ internal sealed class AzureAISearchIndexer(
             else
             {
                 logger.LogDebug("Indexed {Count} documents for {Id} in {IndexAlias}",
-                    documents.Count, id, indexAlias);
+                    mappingResult.Documents.Count, id, indexAlias);
             }
         }
         catch (Exception ex)
@@ -84,8 +86,10 @@ internal sealed class AzureAISearchIndexer(
         var searchClient = clientFactory.GetSearchClient(indexName);
 
         var idList = ids.ToList();
-        var keyFilters = idList.Select(id => $"{IndexConstants.FieldNames.Key} eq '{id:D}'");
-        var filter = string.Join(" or ", keyFilters);
+        var pathIdField = $"{IndexConstants.FieldNames.PathIds}{IndexConstants.FieldTypePostfix.Keywords}";
+
+        var pathIdFilters = idList.Select(id => $"{pathIdField}/any(p: p eq '{id:D}')");
+        var filter = string.Join(" or ", pathIdFilters);
 
         var searchOptions = new SearchOptions
         {

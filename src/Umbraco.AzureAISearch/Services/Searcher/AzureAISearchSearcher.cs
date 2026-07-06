@@ -184,20 +184,124 @@ internal sealed class AzureAISearchSearcher(
     {
         return filter switch
         {
-            KeywordFilter kf => BuildKeywordFilter(kf),
+            KeywordFilter kf => BuildKeywordExactFilter(kf),
+            IntegerExactFilter ief => BuildIntegerExactFilter(ief),
+            DecimalExactFilter def => BuildDecimalExactFilter(def),
+            DateTimeOffsetExactFilter dtf => BuildDateTimeExactFilter(dtf),
+            IntegerRangeFilter irf => BuildIntegerRangeFilter(irf),
+            DecimalRangeFilter drf => BuildDecimalRangeFilter(drf),
+            DateTimeOffsetRangeFilter dtrf => BuildDateTimeRangeFilter(dtrf),
+            TextFilter tf => BuildTextFilter(tf),
             _ => string.Empty
         };
     }
 
-    private static string BuildKeywordFilter(KeywordFilter filter)
+    private static string BuildKeywordExactFilter(KeywordFilter filter)
     {
-        var fieldName = $"{filter.FieldName}_keywords";
+        var fieldName = $"{filter.FieldName}{IndexConstants.FieldTypePostfix.Keywords}";
         var valueList = filter.Values.ToArray();
         if (valueList.Length == 0) return string.Empty;
 
         var condition = string.Join(" or ", valueList.Select(v => $"k eq '{EscapeOData(v)}'"));
         var clause = $"{fieldName}/any(k: {condition})";
         return filter.Negate ? $"not ({clause})" : clause;
+    }
+
+    private static string BuildIntegerExactFilter(IntegerExactFilter filter)
+    {
+        var fieldName = $"{filter.FieldName}{IndexConstants.FieldTypePostfix.Integers}";
+        var values = filter.Values;
+        if (values.Length == 0) return string.Empty;
+
+        var condition = string.Join(" or ", values.Select(v => $"i eq {v}"));
+        var clause = $"{fieldName}/any(i: {condition})";
+        return filter.Negate ? $"not ({clause})" : clause;
+    }
+
+    private static string BuildDecimalExactFilter(DecimalExactFilter filter)
+    {
+        var fieldName = $"{filter.FieldName}{IndexConstants.FieldTypePostfix.Decimals}";
+        var values = filter.Values;
+        if (values.Length == 0) return string.Empty;
+
+        var condition = string.Join(" or ", values.Select(v => $"d eq {v}"));
+        var clause = $"{fieldName}/any(d: {condition})";
+        return filter.Negate ? $"not ({clause})" : clause;
+    }
+
+    private static string BuildDateTimeExactFilter(DateTimeOffsetExactFilter filter)
+    {
+        var fieldName = $"{filter.FieldName}{IndexConstants.FieldTypePostfix.DateTimeOffsets}";
+        var values = filter.Values;
+        if (values.Length == 0) return string.Empty;
+
+        var condition = string.Join(" or ", values.Select(v => $"d eq {v:O}"));
+        var clause = $"{fieldName}/any(d: {condition})";
+        return filter.Negate ? $"not ({clause})" : clause;
+    }
+
+    private static string BuildIntegerRangeFilter(IntegerRangeFilter filter)
+    {
+        var fieldName = $"{filter.FieldName}{IndexConstants.FieldTypePostfix.Integers}{IndexConstants.FieldTypePostfix.Sortable}";
+        var ranges = filter.Ranges;
+        if (ranges.Length == 0) return string.Empty;
+
+        var conditions = ranges.Select(r =>
+        {
+            var parts = new List<string>();
+            if (r.MinValue.HasValue) parts.Add($"{fieldName} ge {r.MinValue.Value}");
+            if (r.MaxValue.HasValue) parts.Add($"{fieldName} le {r.MaxValue.Value}");
+            return parts.Count > 0 ? $"({string.Join(" and ", parts)})" : string.Empty;
+        }).Where(s => s.Length > 0);
+
+        var clause = string.Join(" or ", conditions);
+        return filter.Negate ? $"not ({clause})" : clause;
+    }
+
+    private static string BuildDecimalRangeFilter(DecimalRangeFilter filter)
+    {
+        var fieldName = $"{filter.FieldName}{IndexConstants.FieldTypePostfix.Decimals}{IndexConstants.FieldTypePostfix.Sortable}";
+        var ranges = filter.Ranges;
+        if (ranges.Length == 0) return string.Empty;
+
+        var conditions = ranges.Select(r =>
+        {
+            var parts = new List<string>();
+            if (r.MinValue.HasValue) parts.Add($"{fieldName} ge {r.MinValue.Value}");
+            if (r.MaxValue.HasValue) parts.Add($"{fieldName} le {r.MaxValue.Value}");
+            return parts.Count > 0 ? $"({string.Join(" and ", parts)})" : string.Empty;
+        }).Where(s => s.Length > 0);
+
+        var clause = string.Join(" or ", conditions);
+        return filter.Negate ? $"not ({clause})" : clause;
+    }
+
+    private static string BuildDateTimeRangeFilter(DateTimeOffsetRangeFilter filter)
+    {
+        var fieldName = $"{filter.FieldName}{IndexConstants.FieldTypePostfix.DateTimeOffsets}{IndexConstants.FieldTypePostfix.Sortable}";
+        var ranges = filter.Ranges;
+        if (ranges.Length == 0) return string.Empty;
+
+        var conditions = ranges.Select(r =>
+        {
+            var parts = new List<string>();
+            if (r.MinValue.HasValue) parts.Add($"{fieldName} ge {r.MinValue.Value:O}");
+            if (r.MaxValue.HasValue) parts.Add($"{fieldName} le {r.MaxValue.Value:O}");
+            return parts.Count > 0 ? $"({string.Join(" and ", parts)})" : string.Empty;
+        }).Where(s => s.Length > 0);
+
+        var clause = string.Join(" or ", conditions);
+        return filter.Negate ? $"not ({clause})" : clause;
+    }
+
+    private static string BuildTextFilter(TextFilter filter)
+    {
+        var fieldName = $"{filter.FieldName}{IndexConstants.FieldTypePostfix.Texts}";
+        var values = filter.Values;
+        if (values.Length == 0) return string.Empty;
+
+        var condition = string.Join(" or ", values.Select(v => $"search.ismatch('{EscapeOData(v)}', '{fieldName}')"));
+        return filter.Negate ? $"not ({condition})" : condition;
     }
 
     private static string EscapeOData(string value) => value.Replace("'", "''");
