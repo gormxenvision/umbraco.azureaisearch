@@ -101,7 +101,7 @@ internal sealed class DocumentMapper
         var textsR3 = variationFields.SelectMany(f => f.Value.TextsR3 ?? []).ToArray();
         var plainTexts = variationFields.SelectMany(f => f.Value.Texts ?? []).ToArray();
 
-        // Build Foundry 'content' field — include all text tiers + non-system keywords
+        // Build Foundry 'content' field — include all text tiers + non-system keywords (deduplicated)
         var contentParts = new List<string>();
         contentParts.AddRange(textsR1);
         contentParts.AddRange(textsR2);
@@ -112,13 +112,13 @@ internal sealed class DocumentMapper
         foreach (var field in variationFields)
         {
             if (field.Value.Keywords is { } kw && kw.Any()
-                && !IndexConstants.SystemKeywordFields.Contains(field.FieldName))
+                && !IsSystemKeywordField(field.FieldName))
             {
-                contentParts.AddRange(kw);
+                contentParts.AddRange(kw.Where(k => !IsStructuralValue(k)));
             }
         }
 
-        var content = string.Join(" ", contentParts.Where(s => !string.IsNullOrWhiteSpace(s)));
+        var content = string.Join(" ", contentParts.Where(s => !string.IsNullOrWhiteSpace(s)).Distinct());
 
         // Title: first R1 text
         var title = textsR1.FirstOrDefault() ?? plainTexts.FirstOrDefault() ?? string.Empty;
@@ -452,6 +452,13 @@ internal sealed class DocumentMapper
             .Where(v => v.Length > 0)
             .ToArray()
             .NullIfEmpty();
+
+    private static bool IsSystemKeywordField(string fieldName)
+        => IndexConstants.SystemKeywordFields.Contains(fieldName)
+           || IndexConstants.SystemKeywordFieldPrefixes.Any(p => fieldName.StartsWith(p, StringComparison.OrdinalIgnoreCase));
+
+    private static bool IsStructuralValue(string value)
+        => Guid.TryParse(value, out _);
 }
 
 internal static class EnumerableNullExtensions

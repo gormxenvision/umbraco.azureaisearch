@@ -57,5 +57,15 @@ internal static class IndexConstants
         "__Path",
         "__NodeType",
         "__Published",
+        "url",
     };
+
+    /// <summary>
+    /// Field name prefixes whose keyword values should NOT be included in the Foundry 'content' aggregate.
+    /// These represent structural/system metadata rather than user-facing content.
+    /// </summary>
+    public static readonly string[] SystemKeywordFieldPrefixes =
+    [
+        "Umb_",
+    ];
 }
