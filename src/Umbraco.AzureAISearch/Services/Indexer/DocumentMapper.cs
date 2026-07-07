@@ -388,19 +388,21 @@ internal sealed class DocumentMapper
             var content = ctx.UmbracoContext.Content?.GetById(contentKey);
             if (content is null) return urls;
 
+            var urlMode = _baseUrl is not null ? UrlMode.Relative : UrlMode.Absolute;
+
             foreach (var culture in content.Cultures.Keys)
             {
-                var url = _publishedUrlProvider.GetUrl(content, UrlMode.Absolute, culture);
+                var url = _publishedUrlProvider.GetUrl(content, urlMode, culture);
                 if (!string.IsNullOrWhiteSpace(url) && url != "#")
                 {
-                    urls[culture] = url;
+                    urls[culture] = _baseUrl is not null ? BuildUrl(url) : url;
                 }
             }
 
-            var invariantUrl = _publishedUrlProvider.GetUrl(content, UrlMode.Absolute);
+            var invariantUrl = _publishedUrlProvider.GetUrl(content, urlMode);
             if (!string.IsNullOrWhiteSpace(invariantUrl) && invariantUrl != "#")
             {
-                urls[string.Empty] = invariantUrl;
+                urls[string.Empty] = _baseUrl is not null ? BuildUrl(invariantUrl) : invariantUrl;
             }
         }
         catch
