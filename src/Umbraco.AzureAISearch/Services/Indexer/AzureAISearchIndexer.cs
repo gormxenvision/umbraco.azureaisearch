@@ -9,6 +9,7 @@ using Umbraco.AzureAISearch.Services.IndexAliasResolver;
 using Umbraco.AzureAISearch.Services.IndexManager;
 using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Sync;
+using Umbraco.Cms.Core.Web;
 using Umbraco.Cms.Search.Core.Models.Indexing;
 using Umbraco.Cms.Search.Core.Services;
 
@@ -21,6 +22,7 @@ internal sealed class AzureAISearchIndexer(
     DocumentMapper documentMapper,
     IOptions<AzureAISearchOptions> options,
     IServerRoleAccessor serverRoleAccessor,
+    IUmbracoContextFactory umbracoContextFactory,
     ILogger<AzureAISearchIndexer> logger)
     : UmbracoAzureServiceBase(serverRoleAccessor), IAzureAISearchIndexer
 {
@@ -151,7 +153,33 @@ internal sealed class AzureAISearchIndexer(
 
         if (contentTypeField?.Value.Keywords?.FirstOrDefault() is { } alias)
         {
-            return _excludedContentTypes.Contains(alias, StringComparer.OrdinalIgnoreCase);
+            if (_excludedContentTypes.Contains(alias, StringComparer.OrdinalIgnoreCase))
+                return true;
+        }
+
+        // Check if any ancestor has an excluded content type
+        var pathIdsField = fields.FirstOrDefault(f =>
+            string.Equals(f.FieldName, "pathIds", StringComparison.OrdinalIgnoreCase));
+
+        if (pathIdsField?.Value.Keywords is { } pathIds && pathIds.Any())
+        {
+            using var ctx = umbracoContextFactory.EnsureUmbracoContext();
+            var contentCache = ctx.UmbracoContext.Content;
+
+            if (contentCache is not null)
+            {
+                foreach (var pathId in pathIds)
+                {
+                    if (!Guid.TryParse(pathId, out var ancestorKey)) continue;
+
+                    var ancestor = contentCache.GetById(ancestorKey);
+                    if (ancestor is not null &&
+                        _excludedContentTypes.Contains(ancestor.ContentType.Alias, StringComparer.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+                }
+            }
         }
 
         return false;
