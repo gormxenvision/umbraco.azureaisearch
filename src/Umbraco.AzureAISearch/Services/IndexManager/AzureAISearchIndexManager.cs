@@ -163,6 +163,29 @@ internal sealed class AzureAISearchIndexManager(
         index.ScoringProfiles.Add(scoringProfile);
         index.DefaultScoringProfile = IndexConstants.ScoringProfiles.RelevanceBoost;
 
+        // Semantic configuration for Foundry citation support
+        var semanticConfig = new SemanticConfiguration(IndexConstants.SemanticConfigurations.Default, new SemanticPrioritizedFields
+        {
+            TitleField = new SemanticField(IndexConstants.FieldNames.Title),
+            ContentFields =
+            {
+                new SemanticField(IndexConstants.FieldNames.Content),
+                new SemanticField(IndexConstants.FieldNames.ContentR1),
+                new SemanticField(IndexConstants.FieldNames.ContentR2),
+                new SemanticField(IndexConstants.FieldNames.ContentR3),
+            },
+            KeywordsFields =
+            {
+                new SemanticField(IndexConstants.FieldNames.Url),
+            }
+        });
+
+        index.SemanticSearch = new SemanticSearch
+        {
+            Configurations = { semanticConfig },
+            DefaultConfigurationName = IndexConstants.SemanticConfigurations.Default
+        };
+
         return index;
     }
 }

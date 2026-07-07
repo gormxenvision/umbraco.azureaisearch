@@ -133,6 +133,12 @@ internal sealed class DocumentMapper
                   ?? (resolvedUrls.TryGetValue(string.Empty, out var invUrl) ? invUrl : null)
                   ?? BuildUrl(route);
 
+        // Ensure URL is never empty — Foundry needs a valid URL for citations
+        if (string.IsNullOrWhiteSpace(url) && _baseUrl is not null)
+        {
+            url = _baseUrl;
+        }
+
         // Access keys
         var accessKeys = protection?.AccessIds?.Any() is true
             ? protection.AccessIds.Select(g => g.ToString("D")).ToArray()

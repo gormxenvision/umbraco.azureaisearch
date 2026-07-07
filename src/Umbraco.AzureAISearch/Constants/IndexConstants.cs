@@ -45,6 +45,11 @@ internal static class IndexConstants
         public const string RelevanceBoost = "relevanceBoost";
     }
 
+    public static class SemanticConfigurations
+    {
+        public const string Default = "default";
+    }
+
     /// <summary>
     /// System fields whose keyword values should NOT be included in the Foundry 'content' aggregate.
     /// </summary>
