@@ -70,36 +70,18 @@ public class AzureAISearchIndexerExclusionTests
     [Fact]
     public async Task AddOrUpdate_ExcludesDirectContentType()
     {
-        var indexer = CreateIndexer(["settings"]);
+        var contentKey = Guid.NewGuid();
 
-        var fields = new List<IndexField>
-        {
-            new("contentTypeAlias", new IndexValue { Keywords = ["settings"] }, null, null),
-        };
-
-        // Should not throw or call search client
-        await indexer.AddOrUpdateAsync(
-            "test-alias", Guid.NewGuid(), UmbracoObjectTypes.Document,
-            [new Variation(null, null)], fields, null);
-
-        _clientFactory.Verify(x => x.GetSearchClient(It.IsAny<string>()), Times.Never);
-    }
-
-    [Fact]
-    public async Task AddOrUpdate_ExcludesChildOfExcludedContentType()
-    {
-        var settingsKey = Guid.NewGuid();
-        var childKey = Guid.NewGuid();
-
-        // Set up the Umbraco context to return ancestor content type
+        // Mock content with "settings" content type
         var mockContentType = new Mock<IPublishedContentType>();
         mockContentType.Setup(x => x.Alias).Returns("settings");
 
-        var mockAncestor = new Mock<IPublishedContent>();
-        mockAncestor.Setup(x => x.ContentType).Returns(mockContentType.Object);
+        var mockContent = new Mock<IPublishedContent>();
+        mockContent.Setup(x => x.ContentType).Returns(mockContentType.Object);
+        mockContent.Setup(x => x.Parent).Returns((IPublishedContent?)null);
 
         var mockContentCache = new Mock<IPublishedContentCache>();
-        mockContentCache.Setup(x => x.GetById(settingsKey)).Returns(mockAncestor.Object);
+        mockContentCache.Setup(x => x.GetById(contentKey)).Returns(mockContent.Object);
 
         var mockUmbracoContext = new Mock<IUmbracoContext>();
         mockUmbracoContext.Setup(x => x.Content).Returns(mockContentCache.Object);
@@ -109,11 +91,53 @@ public class AzureAISearchIndexerExclusionTests
 
         var indexer = CreateIndexer(["settings"]);
 
-        // Child has a different content type, but its path includes the settings node
         var fields = new List<IndexField>
         {
-            new("contentTypeAlias", new IndexValue { Keywords = ["blogPost"] }, null, null),
-            new("pathIds", new IndexValue { Keywords = [settingsKey.ToString("D"), childKey.ToString("D")] }, null, null),
+            new("body", new IndexValue { Texts = ["Some content"] }, null, null),
+        };
+
+        await indexer.AddOrUpdateAsync(
+            "test-alias", contentKey, UmbracoObjectTypes.Document,
+            [new Variation(null, null)], fields, null);
+
+        _clientFactory.Verify(x => x.GetSearchClient(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task AddOrUpdate_ExcludesChildOfExcludedContentType()
+    {
+        var childKey = Guid.NewGuid();
+
+        // Mock parent with "settings" content type
+        var settingsContentType = new Mock<IPublishedContentType>();
+        settingsContentType.Setup(x => x.Alias).Returns("settings");
+
+        var mockParent = new Mock<IPublishedContent>();
+        mockParent.Setup(x => x.ContentType).Returns(settingsContentType.Object);
+        mockParent.Setup(x => x.Parent).Returns((IPublishedContent?)null);
+
+        // Mock child with "blogPost" content type, parented under settings
+        var childContentType = new Mock<IPublishedContentType>();
+        childContentType.Setup(x => x.Alias).Returns("blogPost");
+
+        var mockChild = new Mock<IPublishedContent>();
+        mockChild.Setup(x => x.ContentType).Returns(childContentType.Object);
+        mockChild.Setup(x => x.Parent).Returns(mockParent.Object);
+
+        var mockContentCache = new Mock<IPublishedContentCache>();
+        mockContentCache.Setup(x => x.GetById(childKey)).Returns(mockChild.Object);
+
+        var mockUmbracoContext = new Mock<IUmbracoContext>();
+        mockUmbracoContext.Setup(x => x.Content).Returns(mockContentCache.Object);
+
+        var ctxRef = new UmbracoContextReference(mockUmbracoContext.Object, false, Mock.Of<IUmbracoContextAccessor>());
+        _umbracoContextFactory.Setup(x => x.EnsureUmbracoContext()).Returns(ctxRef);
+
+        var indexer = CreateIndexer(["settings"]);
+
+        var fields = new List<IndexField>
+        {
+            new("body", new IndexValue { Texts = ["Child content"] }, null, null),
         };
 
         await indexer.AddOrUpdateAsync(
@@ -127,17 +151,26 @@ public class AzureAISearchIndexerExclusionTests
     [Fact]
     public async Task AddOrUpdate_DoesNotExcludeWhenNoAncestorIsExcluded()
     {
-        var parentKey = Guid.NewGuid();
         var childKey = Guid.NewGuid();
 
-        var mockContentType = new Mock<IPublishedContentType>();
-        mockContentType.Setup(x => x.Alias).Returns("homepage");
+        // Mock parent with "homepage" content type (not excluded)
+        var homepageContentType = new Mock<IPublishedContentType>();
+        homepageContentType.Setup(x => x.Alias).Returns("homepage");
 
-        var mockAncestor = new Mock<IPublishedContent>();
-        mockAncestor.Setup(x => x.ContentType).Returns(mockContentType.Object);
+        var mockParent = new Mock<IPublishedContent>();
+        mockParent.Setup(x => x.ContentType).Returns(homepageContentType.Object);
+        mockParent.Setup(x => x.Parent).Returns((IPublishedContent?)null);
+
+        // Mock child with "blogPost" content type
+        var childContentType = new Mock<IPublishedContentType>();
+        childContentType.Setup(x => x.Alias).Returns("blogPost");
+
+        var mockChild = new Mock<IPublishedContent>();
+        mockChild.Setup(x => x.ContentType).Returns(childContentType.Object);
+        mockChild.Setup(x => x.Parent).Returns(mockParent.Object);
 
         var mockContentCache = new Mock<IPublishedContentCache>();
-        mockContentCache.Setup(x => x.GetById(parentKey)).Returns(mockAncestor.Object);
+        mockContentCache.Setup(x => x.GetById(childKey)).Returns(mockChild.Object);
 
         var mockUmbracoContext = new Mock<IUmbracoContext>();
         mockUmbracoContext.Setup(x => x.Content).Returns(mockContentCache.Object);
@@ -145,16 +178,12 @@ public class AzureAISearchIndexerExclusionTests
         var ctxRef = new UmbracoContextReference(mockUmbracoContext.Object, false, Mock.Of<IUmbracoContextAccessor>());
         _umbracoContextFactory.Setup(x => x.EnsureUmbracoContext()).Returns(ctxRef);
 
-        // Mock the search client — IndexDocumentsAsync will throw but that's fine,
-        // we only need to verify the exclusion check was passed
         _clientFactory.Setup(x => x.GetSearchClient(It.IsAny<string>())).Returns(Mock.Of<SearchClient>());
 
         var indexer = CreateIndexer(["settings"]);
 
         var fields = new List<IndexField>
         {
-            new("contentTypeAlias", new IndexValue { Keywords = ["blogPost"] }, null, null),
-            new("pathIds", new IndexValue { Keywords = [parentKey.ToString("D"), childKey.ToString("D")] }, null, null),
             new("body", new IndexValue { Texts = ["Hello world"] }, null, null),
         };
 

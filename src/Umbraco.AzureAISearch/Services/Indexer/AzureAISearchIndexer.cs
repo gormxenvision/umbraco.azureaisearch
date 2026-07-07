@@ -40,7 +40,7 @@ internal sealed class AzureAISearchIndexer(
 
         var fieldsList = fields.ToList();
 
-        if (IsExcluded(fieldsList)) return;
+        if (IsExcluded(id, fieldsList)) return;
 
         var indexName = aliasResolver.Resolve(indexAlias);
         var searchClient = clientFactory.GetSearchClient(indexName);
@@ -144,10 +144,11 @@ internal sealed class AzureAISearchIndexer(
         }
     }
 
-    private bool IsExcluded(List<IndexField> fields)
+    private bool IsExcluded(Guid contentKey, List<IndexField> fields)
     {
         if (_excludedContentTypes.Length == 0) return false;
 
+        // First try field-based check (fast path)
         var contentTypeField = fields.FirstOrDefault(f =>
             string.Equals(f.FieldName, "contentTypeAlias", StringComparison.OrdinalIgnoreCase));
 
@@ -157,29 +158,27 @@ internal sealed class AzureAISearchIndexer(
                 return true;
         }
 
-        // Check if any ancestor has an excluded content type
-        var pathIdsField = fields.FirstOrDefault(f =>
-            string.Equals(f.FieldName, "pathIds", StringComparison.OrdinalIgnoreCase));
+        // Look up the content directly to check its type and ancestors
+        using var ctx = umbracoContextFactory.EnsureUmbracoContext();
+        var contentCache = ctx.UmbracoContext.Content;
 
-        if (pathIdsField?.Value.Keywords is { } pathIds && pathIds.Any())
+        if (contentCache is null) return false;
+
+        var content = contentCache.GetById(contentKey);
+        if (content is null) return false;
+
+        // Check the content's own type (in case field-based check missed it)
+        if (_excludedContentTypes.Contains(content.ContentType.Alias, StringComparer.OrdinalIgnoreCase))
+            return true;
+
+        // Walk up the tree to check ancestors
+        var ancestor = content.Parent;
+        while (ancestor is not null)
         {
-            using var ctx = umbracoContextFactory.EnsureUmbracoContext();
-            var contentCache = ctx.UmbracoContext.Content;
+            if (_excludedContentTypes.Contains(ancestor.ContentType.Alias, StringComparer.OrdinalIgnoreCase))
+                return true;
 
-            if (contentCache is not null)
-            {
-                foreach (var pathId in pathIds)
-                {
-                    if (!Guid.TryParse(pathId, out var ancestorKey)) continue;
-
-                    var ancestor = contentCache.GetById(ancestorKey);
-                    if (ancestor is not null &&
-                        _excludedContentTypes.Contains(ancestor.ContentType.Alias, StringComparer.OrdinalIgnoreCase))
-                    {
-                        return true;
-                    }
-                }
-            }
+            ancestor = ancestor.Parent;
         }
 
         return false;
